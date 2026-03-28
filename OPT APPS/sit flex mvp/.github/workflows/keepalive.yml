@@ -1,0 +1,20 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Svaki dan u 08:00 UTC (Supabase free plan pauza posle 1 nedelje neaktivnosti)
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Supabase
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/service_days?select=id&limit=1"
