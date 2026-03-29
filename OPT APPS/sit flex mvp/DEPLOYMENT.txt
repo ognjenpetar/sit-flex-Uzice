@@ -1,0 +1,217 @@
+================================================================================
+DRT UŽICE – UPUTSTVO ZA DEPLOYMENT
+================================================================================
+
+PREDUSLOVI
+----------
+  - Node.js 20+ instaliran (https://nodejs.org)
+  - Git instaliran
+  - Nalog na GitHub (https://github.com)
+  - Nalog na Supabase (https://supabase.com) – besplatno
+  - Nalog na Vercel (https://vercel.com) – besplatno
+
+================================================================================
+KORAK 1 – SUPABASE PROJEKAT
+================================================================================
+
+1.1 Kreiraj projekat na supabase.com
+    - Klikni "New Project"
+    - Organization: tvoja organizacija
+    - Name: drt-uzice-prod
+    - Database Password: (sačuvaj negde bezbedno!)
+    - Region: eu-central-1 (Frankfurt, najbliže Srbiji)
+    - Plan: Free
+    - Klikni "Create new project" i sačekaj ~2 minute
+
+1.2 Izvlačenje potrebnih vrednosti:
+    Idi na: Settings → API
+
+    Sačuvaj:
+      SUPABASE_PROJECT_REF    = (npr. "abcdefghijklmnop" – deo URL-a)
+      VITE_SUPABASE_URL       = https://[PROJECT_REF].supabase.co
+      VITE_SUPABASE_ANON_KEY  = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (anon/public ključ)
+      SUPABASE_SERVICE_ROLE_KEY = eyJ... (service_role ključ – TAJNO, nikad u frontend!)
+
+    Idi na: Settings → General
+      SUPABASE_ACCESS_TOKEN   = generiši na https://supabase.com/dashboard/account/tokens
+
+1.3 Pokretanje migracija (radi lokalno ili kroz Supabase Dashboard):
+
+    OPCIJA A – Supabase CLI (preporučeno):
+      npm install -g supabase
+      supabase login
+      supabase link --project-ref [PROJECT_REF]
+      supabase db push
+
+    OPCIJA B – Supabase Dashboard (SQL Editor):
+      Idi na: SQL Editor u Supabase Dashboard
+      Pokreni fajlove redom:
+        1. supabase/migrations/00001_schema.sql
+        2. supabase/migrations/00002_seed.sql
+        3. supabase/migrations/00003_functions.sql
+        4. supabase/migrations/00004_rls.sql
+
+1.4 Podešavanje Auth:
+    Idi na: Authentication → Settings
+      - Site URL: https://[tvoj-vercel-domen].vercel.app
+      - Disable "Enable email confirmations" (za internu upotrebu)
+      - Disable "Enable new user signups" (korisnici se prave samo kroz admin)
+
+    Idi na: Authentication → Users
+      Klikni "Invite user" ili "Add user" za svakog korisnika:
+        admin@drt-uzice.rs     | lozinka | role: admin
+        dispecer@drt-uzice.rs  | lozinka | role: dispatcher
+        vozac1@drt-uzice.rs    | lozinka | role: driver
+
+    NAPOMENA: Posle kreiranja auth korisnika, OBAVEZNO dodaj u profiles tabelu:
+      INSERT INTO public.profiles (id, username, full_name, role)
+      VALUES (
+        '[UUID korisnika iz Auth]',
+        'dispecer1',
+        'Marija Petrović',
+        'dispatcher'
+      );
+
+    Za vozača, takođe dodaj u drivers tabelu:
+      INSERT INTO public.drivers (first_name, last_name, phone, profile_id)
+      VALUES ('Jovan', 'Nikolić', '0641234567', '[UUID korisnika]');
+
+================================================================================
+KORAK 2 – VERCEL DEPLOY
+================================================================================
+
+2.1 Idite na vercel.com i prijavite se (možete sa GitHub nalogom)
+
+2.2 Import projekta:
+    - Klikni "Add New Project"
+    - Import from GitHub
+    - Odaberi repo: ognjenpetar/sit-flex-Uzice
+    - Framework Preset: Vite (auto-detect)
+    - Root Directory: "OPT APPS/sit flex mvp" (važno!)
+
+2.3 Environment Variables u Vercel projektu:
+    Settings → Environment Variables → Add:
+
+      VITE_SUPABASE_URL        = https://[PROJECT_REF].supabase.co
+      VITE_SUPABASE_ANON_KEY   = eyJ... (anon ključ)
+
+    Primeni na: Production, Preview, Development
+
+2.4 Deploy:
+    - Klikni "Deploy"
+    - Sačekaj 1-2 minuta
+    - Dobijaš URL: https://sit-flex-uzice.vercel.app (ili sličan)
+
+2.5 Ažuriraj Supabase Site URL:
+    Idi na Supabase → Authentication → Settings
+    Site URL = https://[tvoj-vercel-url].vercel.app
+
+================================================================================
+KORAK 3 – GITHUB ACTIONS (automatski deploy na svaki push)
+================================================================================
+
+3.1 U GitHub repozitorijumu idi na:
+    Settings → Secrets and variables → Actions → New repository secret
+
+    Dodaj ove tajne vrednosti:
+      VITE_SUPABASE_URL          = https://[PROJECT_REF].supabase.co
+      VITE_SUPABASE_ANON_KEY     = eyJ... (anon ključ)
+      SUPABASE_PROJECT_REF       = [PROJECT_REF]
+      SUPABASE_ACCESS_TOKEN      = sbp_... (personal access token)
+      VERCEL_TOKEN               = (Settings → Tokens na vercel.com)
+      VERCEL_ORG_ID              = (Settings → General na vercel.com)
+      VERCEL_PROJECT_ID          = (Settings → General na vercel.com)
+
+3.2 Posle ovoga, svaki push na main granu:
+    → automatski pokreće migracije na Supabase
+    → automatski deploya frontend na Vercel
+
+================================================================================
+KORAK 4 – LOKALNI RAZVOJ
+================================================================================
+
+4.1 Kloniranje repozitorijuma:
+    git clone https://github.com/ognjenpetar/sit-flex-Uzice.git
+    cd "sit-flex-Uzice/OPT APPS/sit flex mvp"
+
+4.2 Instalacija zavisnosti:
+    npm install
+
+4.3 Kreirati .env.local fajl (kopiraj .env.example):
+    VITE_SUPABASE_URL=https://[PROJECT_REF].supabase.co
+    VITE_SUPABASE_ANON_KEY=eyJ...
+
+4.4 Pokretanje razvojnog servera:
+    npm run dev
+    → aplikacija dostupna na http://localhost:3000
+
+4.5 Typecheck i lint:
+    npm run typecheck
+    npm run lint
+
+================================================================================
+KORISNICI I PRISTUP
+================================================================================
+
+Tipovi naloga:
+
+  ADMIN
+    Email: po dogovoru
+    Pristup: sve stranice, uključujući /admin/*
+    Kreira/deaktivira ostale naloge
+
+  DISPEČER
+    Email: po dogovoru
+    Pristup: /dispatcher (rezervacije, plan, mapa, putnici)
+    Ne može: admin stranice
+
+  VOZAČ
+    Email: po dogovoru
+    Pristup: /driver/today i /driver/trip/:id
+    Vidi: samo sopstvene vožnje za tekući dan
+
+Kreiranje novog naloga (admin to radi kroz Supabase Dashboard):
+  1. Authentication → Users → "Add user"
+  2. Unesi email i lozinku
+  3. Dodaj u profiles tabelu sa odgovarajućom rolom
+  4. Ako je vozač: dodaj u drivers tabelu
+
+================================================================================
+SUPABASE FREE PLAN – VAŽNE NAPOMENE
+================================================================================
+
+  - Projekat se PAUZIRA posle 7 dana neaktivnosti
+  - GitHub Action "keepalive.yml" šalje ping svaki dan u 08:00 UTC
+    → sprečava pauzu tokom aktivnog razvoja
+
+  - Limiti:
+    * 500MB database storage
+    * 500.000 Edge Function poziva/mesec
+    * 50.000 aktivnih korisnika/mesec
+    * Sve više nego dovoljno za DRT pilot
+
+  - Ako se projekat ipak pauzira:
+    Idi na supabase.com → tvoj projekat → "Restore project"
+    (traje ~2 minute)
+
+================================================================================
+MONITORING I LOGOVI
+================================================================================
+
+  Supabase Dashboard:
+    - Logs → API: svi zahtevi ka bazi
+    - Logs → Edge Functions: logovi edge funkcija
+    - Database → Extensions → pg_cron: status schedulovanih jobova
+
+  Vercel Dashboard:
+    - Deployments: istorija deploya
+    - Functions: logovi serverless funkcija
+
+================================================================================
+KONTAKT I PODRŠKA
+================================================================================
+
+  Projekat: URBACT IV SIT FLEXI Transfer Network (ref: 21980)
+  GitHub: https://github.com/ognjenpetar/sit-flex-Uzice
+  Pilot start: 2026-04-01
+  Trajanje: novembar 2025 – april 2028

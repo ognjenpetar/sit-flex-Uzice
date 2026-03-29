@@ -1,0 +1,188 @@
+================================================================================
+DRT UŽICE – DISPEČERSKI SISTEM
+Demand Responsive Transport | URBACT IV SIT FLEXI Transfer Network
+Ref: 21980 | Trajanje: novembar 2025 – april 2028
+================================================================================
+
+ŠITA JE OVA APLIKACIJA?
+------------------------
+Web aplikacija za upravljanje prevozom na zahtev (DRT) za grad Užice, Srbija.
+Sistem omogućava gradskom dispečerskom centru da prima telefonske zahteve
+za prevoz od građana i koordinira vozače jednog ugovorenog taxi operatera.
+
+PILOT ZONE:
+  - Kaćer naselje: ~150 stanovnika, bez organizovanog prevoza
+  - Tara planina: ~100 stanovnika, bez organizovanog prevoza
+
+RADNI MODEL:
+  - Korisnik zove dispečera telefonom
+  - Dispečer unosi rezervaciju u sistem (cilj: < 60 sekundi)
+  - Sistem izračunava cenu automatski na osnovu distance i tarife
+  - Dispečer dodeljuje vozača
+  - Vozač dobija pregled dana na svom uređaju
+  - Nema passenger samoposluživanja u MVP-u
+
+================================================================================
+KORISNIČKE GRUPE I ULOGE
+================================================================================
+
+1. DISPEČER (role: dispatcher)
+   - Pristup: /login → /dispatcher
+   - Može: kreirati/pregledati/menjati status rezervacija
+   - Može: pretraživati i dodavati putnike
+   - Može: videti dnevni plan i mapu
+   - Radni dan: 07:00 – 19:00, rezervacije do 15:00 za sutra
+
+2. VOZAČ (role: driver)
+   - Pristup: /login → /driver/today
+   - Vidi: samo sopstvene vožnje za tekući dan
+   - Može: potvrditi preuzimanje putnika, završiti vožnju, označiti no-show
+   - Optimizovano za mobilni telefon/tablet
+
+3. ADMINISTRATOR (role: admin)
+   - Pristup: /login → /admin/*
+   - Može: kreirati/deaktivirati naloge (dispečeri, vozači)
+   - Može: upravljati voznim parkom, stajalištima, matricom distanci
+   - Može: menjati sistemska podešavanja (tarife, radno vreme, operater)
+   - Može: videti sve izveštaje i URBACT KPI
+
+================================================================================
+SISTEM NAPLATE
+================================================================================
+
+Cena vožnje = distance_km × tarifa_rsd_per_km
+
+Tri konfigurabline tarife:
+  T1 – Standardna tarifa:  80 RSD/km
+  T2 – Snižena tarifa:     55 RSD/km
+  T3 – Socijalna tarifa:   35 RSD/km
+
+Subvencija: apsolutni RSD iznos koji odlučuje dispečer po vožnji.
+Grad pokriva razliku između cene putnika i cene operateru.
+
+fare_rsd_operator  = pun iznos (uvek)
+fare_rsd_passenger = fare_rsd_calculated - subsidy_rsd
+fare_rsd_operator  = fare_rsd_calculated (uvek, grad plaća subvenciju)
+
+================================================================================
+STATUSNI CIKLUS REZERVACIJE
+================================================================================
+
+  PENDING
+    │ Dispečer potvrdi
+    ▼
+  CONFIRMED
+    │ Dodeli vozač
+    ▼
+  ASSIGNED
+    │ Vozač krene ka putniku
+    ▼
+  IN_PROGRESS
+    │ Vožnja završena
+    ▼
+  COMPLETED
+
+Izlazi:
+  PENDING/CONFIRMED/ASSIGNED → CANCELLED (otkazana)
+  ASSIGNED → NO_SHOW (putnik nije došao)
+
+================================================================================
+JAVNE STRANICE (bez login-a)
+================================================================================
+
+  /pozovi-me     – Forma za povratni poziv (citizen self-service)
+                   Građanin unese ime i telefon, dispečer pozove nazad.
+
+  /ocena/:token  – Anketa zadovoljstva (1-5 zvezde)
+                   Šalje se putniku 24h po završetku vožnje.
+
+================================================================================
+URBACT KPI – ŠTA SE MERI
+================================================================================
+
+  - trips/month              – broj vožnji mesečno
+  - users/month              – broj jedinstvenih korisnika
+  - avg wait time (min)      – prosečno vreme čekanja
+  - cancellations/no-shows % – procenat otkazivanja
+  - coverage (aktivna stajališta)
+  - cost/trip (RSD)          – prosečna cena po vožnji
+  - user satisfaction (1-5)  – prosečna ocena zadovoljstva
+
+Ciljevi (pilot):
+  ≥ 200 vožnji/mesec | ≥ 50 korisnika/mesec | ≤ 20 min čekanje
+  ≤ 5% otkazivanja   | ≥ 4.0 zadovoljstvo
+
+================================================================================
+TECH STACK
+================================================================================
+
+Frontend:
+  React 18 + Vite + TypeScript (strict mode)
+  Tailwind CSS v3 + shadcn/ui komponente
+  Leaflet.js + OpenStreetMap (bez API ključa, besplatno)
+  TanStack Query v5 (data fetching + caching)
+  Supabase Realtime (WebSocket, live updates)
+  React Router v6 | React Hook Form + Zod | Zustand | Sonner
+
+Backend:
+  Supabase (PostgreSQL 15 + PostGIS + Auth + Realtime + Edge Functions)
+  Edge Functions pisane u Deno/TypeScript
+
+Hosting:
+  Vercel (Hobby plan, besplatno) – frontend
+  Supabase (Free forever plan) – backend + baza
+
+Sve besplatno. Nema troškova infrastrukture za pilot.
+
+================================================================================
+FOLDER STRUKTURA
+================================================================================
+
+  src/
+    App.tsx                  – routing i auth zaštita ruta
+    pages/
+      Login.tsx              – prijava (email + lozinka)
+      dispatcher/
+        Workspace.tsx        – 4 taba: Rezervacije | Plan | Mapa | Putnici
+      driver/
+        Today.tsx            – dnevni pregled vožnji za vozača
+        TripNav.tsx          – detalji vožnje + akcije
+      admin/
+        Users.tsx            – upravljanje nalozima
+        Fleet.tsx            – vozni park
+        Stops.tsx            – stajališta
+        Distances.tsx        – matrica distanci
+        Settings.tsx         – sistemska podešavanja
+      reports/
+        Overview.tsx         – pregled KPI
+        Financial.tsx        – finansijski izveštaj
+        UrbactPanel.tsx      – URBACT export
+      CallbackRequest.tsx    – /pozovi-me (javno)
+      SatisfactionRating.tsx – /ocena/:token (javno)
+    components/
+      workspace/             – tabovi u dispečerskom radnom prostoru
+    hooks/                   – React Query hookovi
+    lib/
+      supabase.ts            – Supabase klijent
+      database.types.ts      – TypeScript tipovi za bazu
+      constants.ts           – labeli, boje statusa
+      utils.ts               – format helpers
+    stores/
+      auth.store.ts          – Zustand auth state
+
+  supabase/
+    migrations/
+      00001_schema.sql       – kompletan DB schema
+      00002_seed.sql         – početni podaci (stajališta, vozila, testni putnici)
+      00003_functions.sql    – calculate_fare, validate_transition, KPI view, pg_cron
+      00004_rls.sql          – Row Level Security za sve tabele
+    functions/
+      booking-create/        – Edge Function: kreiranje rezervacije
+      booking-transition/    – Edge Function: promena statusa
+      auto-assign/           – Edge Function: automatsko dodeljivanje vozača
+      validate-qr-token/     – Edge Function: validacija QR login tokena
+
+  .github/workflows/
+    ci.yml                   – lint + typecheck na svakom pushu
+    deploy.yml               – deploy na push na main granu
+    keepalive.yml            – dnevni ping Supabase (sprečava pauzu free plana)
